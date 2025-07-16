@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
 import { useWallet } from "@/contexts/wallet-context";
 import { useCryptoPrices } from "@/hooks/use-crypto-prices";
+import { useWeb3Transactions } from "@/hooks/use-web3-transactions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { TransactionButton } from "@/components/wallet/transaction-button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { TOKEN_CONFIGS } from "@/lib/wallet-utils";
-import { Send, ArrowLeft, RefreshCw, Wallet } from "lucide-react";
+import { TOKEN_CONFIGS, isValidAddress, formatBalance } from "@/lib/wallet-utils";
+import { Send, ArrowLeft, RefreshCw, Wallet, CheckCircle, AlertCircle } from "lucide-react";
 import { ethers } from "ethers";
 
 interface PaymentFormProps {
@@ -20,18 +23,46 @@ interface PaymentFormProps {
 export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps) {
   const { state: walletState } = useWallet();
   const { convertToINR, getPriceInINR } = useCryptoPrices();
+  const { transactionState, estimateGas } = useWeb3Transactions();
   const queryClient = useQueryClient();
   
   const [selectedToken, setSelectedToken] = useState("eth");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState(recipientData?.data?.address || "");
   const [error, setError] = useState("");
+  const [gasEstimate, setGasEstimate] = useState<string>("");
+  const [isValidRecipient, setIsValidRecipient] = useState(false);
 
   useEffect(() => {
     if (recipientData?.data?.address) {
       setRecipient(recipientData.data.address);
     }
   }, [recipientData]);
+
+  useEffect(() => {
+    setIsValidRecipient(isValidAddress(recipient));
+  }, [recipient]);
+
+  useEffect(() => {
+    const estimateTransactionGas = async () => {
+      if (walletState.isConnected && amount && isValidRecipient && parseFloat(amount) > 0) {
+        try {
+          const gas = await estimateGas({
+            to: recipient,
+            value: amount,
+          });
+          setGasEstimate(ethers.formatEther(gas * BigInt(20_000_000_000))); // Assuming 20 gwei gas price
+        } catch (error) {
+          setGasEstimate("");
+        }
+      } else {
+        setGasEstimate("");
+      }
+    };
+
+    const timeoutId = setTimeout(estimateTransactionGas, 500);
+    return () => clearTimeout(timeoutId);
+  }, [amount, recipient, isValidRecipient, walletState.isConnected, estimateGas]);
 
   const createTransactionMutation = useMutation({
     mutationFn: async (transactionData: any) => {
@@ -210,9 +241,42 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
                 placeholder="0x742d35Cc6648..."
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                className="font-mono text-sm"
+                className={`font-mono text-sm ${
+                  recipient && !isValidRecipient ? "border-red-300" : 
+                  recipient && isValidRecipient ? "border-emerald-300" : ""
+                }`}
               />
+              <div className="flex justify-between items-center mt-1">
+                {recipientData && (
+                  <div className="text-sm text-emerald-600 flex items-center">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Scanned from QR code
+                  </div>
+                )}
+                {recipient && !isValidRecipient && (
+                  <div className="text-sm text-red-600 flex items-center">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    Invalid address format
+                  </div>
+                )}
+                {recipient && isValidRecipient && !recipientData && (
+                  <div className="text-sm text-emerald-600 flex items-center">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Valid address
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Gas Estimate */}
+            {gasEstimate && (
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <div className="text-sm text-slate-600 mb-1">Estimated Gas Fee</div>
+                <div className="text-sm font-medium text-slate-800">
+                  ~{formatBalance(gasEstimate, 6)} ETH
+                </div>
+              </div>
+            )}
 
             {error && (
               <Alert variant="destructive">
@@ -222,23 +286,39 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              <Button
-                onClick={handleSendTransaction}
-                disabled={!walletState.isConnected || createTransactionMutation.isPending || !amount || !recipient}
-                className="w-full gradient-primary hover:opacity-90 text-white"
-              >
-                {createTransactionMutation.isPending ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Payment
-                  </>
-                )}
-              </Button>
+              {walletState.isConnected && amount && recipient && isValidRecipient ? (
+                <TransactionButton
+                  to={recipient}
+                  amount={amount}
+                  label="Send Payment"
+                  onSuccess={(hash) => {
+                    // Create transaction record in database
+                    createTransactionMutation.mutate({
+                      hash,
+                      fromAddress: walletState.address,
+                      toAddress: recipient,
+                      amount: amount,
+                      token: selectedToken,
+                      network: walletState.network || "ethereum",
+                      inrValue: inrValue.toString(),
+                    });
+                    onSectionChange("transaction-status");
+                  }}
+                  onError={(error) => setError(error)}
+                  className="gradient-primary"
+                />
+              ) : (
+                <Button
+                  disabled
+                  className="w-full gradient-primary text-white opacity-50"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {!walletState.isConnected ? "Connect Wallet" : 
+                   !amount ? "Enter Amount" :
+                   !recipient ? "Enter Recipient" :
+                   !isValidRecipient ? "Invalid Address" : "Send Payment"}
+                </Button>
+              )}
               
               <Button
                 variant="ghost"
