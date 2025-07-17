@@ -1,16 +1,17 @@
 {
   "version": 2,
+  "name": "passportpal",
   "builds": [
-    {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "client/dist"
-      }
-    }
+    { "src": "client/package.json", "use": "@vercel/static-build", "config": { "distDir": "client/dist" } }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "/client/dist/$1" }
+    { "src": "/(attached_assets|brand_images|shared)/(.*)", "dest": "/$1/$2" },
+    { "src": "/(.*)", "dest": "/client/$1" }
   ],
-  "ignoreCommand": "echo 'Ignoring server directory for frontend-only deployment'"
+  "static": [
+    { "src": "attached_assets", "dest": "attached_assets" },
+    { "src": "brand_images", "dest": "brand_images" },
+    { "src": "shared", "dest": "shared" }
+  ],
+  "rootDirectory": "client"
 } 
