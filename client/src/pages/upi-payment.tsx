@@ -11,6 +11,16 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { TOKEN_CONFIGS } from "@/lib/wallet-utils";
 import { Smartphone, CreditCard, QrCode, Info, ArrowLeft } from "lucide-react";
+import QRCode from "react-qr-code";
+import QrReader from 'react-qr-reader';
+
+type PaymentIntent = {
+  id: string;
+  upiVpa: string;
+  inrAmount: string;
+  qrCodeData: string;
+  // add other properties as needed
+};
 
 interface UPIPaymentProps {
   onSectionChange: (section: string) => void;
@@ -24,8 +34,10 @@ export function UPIPayment({ onSectionChange, upiData }: UPIPaymentProps) {
   const [selectedToken, setSelectedToken] = useState("eth");
   const [cryptoAmount, setCryptoAmount] = useState("");
   const [upiVpa, setUpiVpa] = useState(upiData?.data?.vpa || "");
-  const [paymentIntent, setPaymentIntent] = useState(null);
+  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
   const [error, setError] = useState("");
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [manualInput, setManualInput] = useState<string | null>(null);
 
   useEffect(() => {
     if (upiData?.data?.vpa) {
@@ -189,7 +201,11 @@ export function UPIPayment({ onSectionChange, upiData }: UPIPaymentProps) {
                     </div>
                     <div className="bg-white border-2 border-slate-200 rounded-xl p-4 inline-block">
                       <div className="w-48 h-48 bg-slate-100 rounded-lg flex items-center justify-center">
-                        <QrCode className="w-24 h-24 text-slate-400" />
+                        {paymentIntent.qrCodeData ? (
+                          <QRCode value={paymentIntent.qrCodeData} size={180} />
+                        ) : (
+                          <QrCode className="w-24 h-24 text-slate-400" />
+                        )}
                       </div>
                     </div>
                     <div className="text-xs text-slate-500 mt-2">

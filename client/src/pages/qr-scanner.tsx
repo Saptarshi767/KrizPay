@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { QrCode, Camera, ArrowRight, Info, ArrowLeft } from "lucide-react";
 import { parseQRCode, validateQRInput } from "@/lib/qr-utils";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 interface QRScannerProps {
   onSectionChange: (section: string) => void;
@@ -17,6 +18,40 @@ export function QRScanner({ onSectionChange, onQRProcessed }: QRScannerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
   const [cameraError, setCameraError] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [scanning, setScanning] = useState(false);
+
+  useEffect(() => {
+    let codeReader: BrowserMultiFormatReader | null = null;
+    if (videoRef.current) {
+      codeReader = new BrowserMultiFormatReader();
+      setScanning(true);
+      codeReader.decodeFromVideoDevice(
+        undefined,
+        videoRef.current,
+        (result, err) => {
+          if (result) {
+            setManualInput(result.getText());
+            setScanning(false);
+            codeReader?.stopContinuousDecode(); // stop scanning after a result
+            // Optionally auto-process the code here
+          }
+          if (err && !(err.name === 'NotFoundException')) {
+            setCameraError(err.message || 'Camera error');
+          }
+        }
+      ).catch((err) => {
+        setCameraError(err.message || 'Camera error');
+        setScanning(false);
+      });
+    }
+    return () => {
+      if (codeReader && typeof codeReader.stopContinuousDecode === "function") {
+        codeReader.stopContinuousDecode();
+      }
+      setScanning(false);
+    };
+  }, []);
 
   const handleManualInput = useCallback((value: string) => {
     setManualInput(value);
@@ -69,19 +104,15 @@ export function QRScanner({ onSectionChange, onQRProcessed }: QRScannerProps) {
           <CardContent className="p-0">
             {/* Camera View */}
             <div className="relative bg-black aspect-square">
+              <video ref={videoRef} className="w-full h-full object-cover rounded-xl" autoPlay muted playsInline />
               <div className="absolute inset-4 border-2 border-white rounded-xl opacity-50"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-white text-center">
-                  <Camera className="w-16 h-16 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm opacity-75">Camera will appear here</p>
-                  <p className="text-xs opacity-50 mt-1">Grant camera permission</p>
-                  {cameraError && (
-                    <p className="text-xs text-red-400 mt-2">{cameraError}</p>
-                  )}
-                </div>
-              </div>
               {/* Scanning line animation */}
               <div className="scan-line"></div>
+              {cameraError && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-xs text-red-400 bg-black bg-opacity-70 p-2 rounded">{cameraError}</p>
+                </div>
+              )}
             </div>
             
             <div className="p-4 space-y-4">
