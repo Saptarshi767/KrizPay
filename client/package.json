@@ -1,0 +1,22 @@
+{
+  "name": "passportpal-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PassportPal Frontend - Vite + React",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "vite": "^4.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "gh-pages": "^6.0.0"
+  },
+  "homepage": "./"
+} 
