@@ -1,3 +1,4 @@
+import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
@@ -13,14 +14,14 @@ export default defineConfig({
         theme_color: '#10b981',
         icons: [
           {
-            src: '/icons/icon-192x192.png',
+            src: '/brand_images/Kpicon.svg',
             sizes: '192x192',
-            type: 'image/png',
+            type: 'image/svg+xml',
           },
           {
-            src: '/icons/icon-512x512.png',
+            src: '/brand_images/Kpicon.svg',
             sizes: '512x512',
-            type: 'image/png',
+            type: 'image/svg+xml',
           },
         ],
       },
