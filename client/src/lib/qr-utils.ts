@@ -19,6 +19,43 @@ export function parseQRCode(qrData: string): { type: 'upi' | 'address' | 'unknow
     };
   }
 
+  // Check for EIP-681 or similar format (e.g., ethereum:0x1234...?value=0.01&token=sepoliaETH)
+  if (qrData.startsWith('ethereum:')) {
+    try {
+      const [addressPart, queryString] = qrData.replace('ethereum:', '').split('?');
+      const params = new URLSearchParams(queryString || '');
+      let amount = '';
+      if (params.get('value')) {
+        // Convert from wei to ETH for display
+        amount = (Number(params.get('value')) / 1e18).toString();
+      }
+      return {
+        type: 'address',
+        data: {
+          address: addressPart,
+          amount,
+          token: params.get('token') || 'eth',
+          network: 'ethereum',
+        }
+      };
+    } catch {
+      // fallback to unknown
+    }
+  }
+
+  // Handle QR codes like 0x...@0x... (address@chainId)
+  const atIdx = qrData.indexOf('@0x');
+  if (qrData.startsWith('0x') && atIdx > 0) {
+    return {
+      type: 'address',
+      data: {
+        address: qrData.slice(0, atIdx),
+        chainId: qrData.slice(atIdx + 1),
+        network: 'ethereum', // or map chainId to network name if needed
+      }
+    };
+  }
+
   // Check if it's a crypto address
   if (qrData.startsWith('0x') && qrData.length === 42) {
     return {
@@ -78,4 +115,10 @@ export function validateQRInput(input: string): { isValid: boolean; type: 'upi' 
   }
 
   return { isValid: false, type: null, error: 'Unsupported QR code format' };
+}
+
+export function generateMetaMaskQR(address: string, ethAmount: string) {
+  // Convert ETH to wei
+  const wei = BigInt(Number(ethAmount) * 1e18).toString();
+  return `ethereum:${address}?value=${wei}`;
 }

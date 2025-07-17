@@ -204,7 +204,7 @@ export function UPIPayment({ onSectionChange, upiData }: UPIPaymentProps) {
                         {paymentIntent.qrCodeData ? (
                           <QRCode value={paymentIntent.qrCodeData} size={180} />
                         ) : (
-                          <QrCode className="w-24 h-24 text-slate-400" />
+                        <QrCode className="w-24 h-24 text-slate-400" />
                         )}
                       </div>
                     </div>

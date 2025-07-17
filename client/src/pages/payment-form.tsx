@@ -14,9 +14,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { TOKEN_CONFIGS, isValidAddress, formatBalance } from "@/lib/wallet-utils";
 import { Send, ArrowLeft, RefreshCw, Wallet, CheckCircle, AlertCircle } from "lucide-react";
 import { ethers } from "ethers";
+import { generateMetaMaskQR } from "@/lib/qr-utils";
+import QRCode from "react-qr-code";
+import { QRScanner } from "./qr-scanner";
 
 interface PaymentFormProps {
-  onSectionChange: (section: string) => void;
+  onSectionChange: (section: string, data?: any) => void;
   recipientData?: any;
 }
 
@@ -26,16 +29,39 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
   const { transactionState, estimateGas } = useWeb3Transactions();
   const queryClient = useQueryClient();
   
-  const [selectedToken, setSelectedToken] = useState("eth");
+  const [selectedToken, setSelectedToken] = useState<keyof typeof TOKEN_CONFIGS>("eth");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState(recipientData?.data?.address || "");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
   const [gasEstimate, setGasEstimate] = useState<string>("");
   const [isValidRecipient, setIsValidRecipient] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [scannedFromQR, setScannedFromQR] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   useEffect(() => {
-    if (recipientData?.data?.address) {
-      setRecipient(recipientData.data.address);
+    // Strip any '@...' suffix from the address before validation
+    let cleanAddress = recipientData?.data?.address;
+    if (typeof cleanAddress === 'string' && cleanAddress.includes('@')) {
+      cleanAddress = cleanAddress.slice(0, cleanAddress.indexOf('@'));
+    }
+    // Only set recipient if address is present, is 42 chars, and is a valid EIP-55 address
+    if (cleanAddress &&
+        cleanAddress.length === 42 &&
+        isValidAddress(cleanAddress) &&
+        ethers.getAddress(cleanAddress) === cleanAddress) {
+      setRecipient(cleanAddress);
+      setScannedFromQR(true);
+    } else if (recipientData?.data?.address) {
+      setError("Scanned address is not a valid EIP-55 checksummed Ethereum address.");
+    }
+    if (recipientData?.data?.amount) {
+      setAmount(recipientData.data.amount);
+      setScannedFromQR(true);
+    }
+    if (recipientData?.data?.token) {
+      setSelectedToken(recipientData.data.token as keyof typeof TOKEN_CONFIGS);
+      setScannedFromQR(true);
     }
   }, [recipientData]);
 
@@ -73,8 +99,12 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       onSectionChange("transaction-status");
     },
-    onError: (error) => {
-      setError(error.message);
+    onError: (error: unknown) => {
+      if (typeof error === "object" && error && "message" in error) {
+        setError((error as { message: string }).message);
+      } else {
+        setError("An unknown error occurred");
+      }
     },
   });
 
@@ -112,7 +142,7 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
       });
 
       // Save transaction to backend
-      await createTransactionMutation.mutateAsync({
+      const transactionRecord = await createTransactionMutation.mutateAsync({
         hash: tx.hash,
         fromAddress: walletState.address,
         toAddress: recipient,
@@ -122,7 +152,19 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
         inrValue: inrValue.toString(),
       });
 
-    } catch (error) {
+      // Pass real transaction data to status page
+      onSectionChange("transaction-status", { transactionData: {
+        hash: tx.hash,
+        amount,
+        token: selectedToken,
+        inrValue: inrValue.toString(),
+        network: walletState.network || "ethereum",
+        status: "pending",
+        from: walletState.address,
+        to: recipient,
+        timestamp: new Date().toISOString(),
+      }});
+    } catch (error: any) {
       setError(error.message || "Transaction failed");
     }
   };
@@ -132,8 +174,30 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
     ...config,
   }));
 
+  // Type guard for TOKEN_CONFIGS access
+  function getTokenConfig(token: string) {
+    return TOKEN_CONFIGS[token as keyof typeof TOKEN_CONFIGS] || TOKEN_CONFIGS["eth"];
+  }
+
   const inrValue = amount ? convertToINR(parseFloat(amount), selectedToken) : 0;
   const currentPrice = getPriceInINR(selectedToken);
+  // Update QR string logic for MetaMask compatibility
+  const qrString = recipient && amount
+    ? generateMetaMaskQR(recipient, amount)
+    : recipient
+      ? recipient
+      : "";
+
+  // Handler for QR scan result
+  const handleQRProcessed = (parsed: any) => {
+    if (parsed.type === "address" && parsed.data?.address) {
+      setRecipient(parsed.data.address);
+      if (parsed.data.amount) setAmount(parsed.data.amount);
+      if (parsed.data.token) setSelectedToken(parsed.data.token as keyof typeof TOKEN_CONFIGS);
+      setScannedFromQR(true);
+    }
+    setShowQRScanner(false);
+  };
 
   return (
     <section className="py-8">
@@ -155,6 +219,26 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
           </div>
           
           <CardContent className="p-6 space-y-6">
+            <Button
+              type="button"
+              className="w-full bg-blue-100 text-blue-800 border border-blue-300 mb-2"
+              onClick={() => setShowQRScanner(true)}
+            >
+              Scan Ethereum Address QR
+            </Button>
+            {showQRScanner && (
+              <div className="mb-4">
+                <QRScanner
+                  onSectionChange={() => setShowQRScanner(false)}
+                  onQRProcessed={handleQRProcessed}
+                />
+              </div>
+            )}
+            {scannedFromQR && (
+              <Badge className="mb-2 bg-emerald-100 text-emerald-800 border-emerald-300">
+                Scanned from QR: You are sending {amount || "-"} {getTokenConfig(selectedToken).symbol || "ETH"} (≈ ₹{inrValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}) to {recipient?.slice(0, 8)}...{recipient?.slice(-4)}
+              </Badge>
+            )}
             {!walletState.isConnected && (
               <Alert>
                 <Wallet className="w-4 h-4" />
@@ -172,7 +256,7 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
                   <Button
                     key={token.id}
                     variant={selectedToken === token.id ? "default" : "outline"}
-                    onClick={() => setSelectedToken(token.id)}
+                    onClick={() => setSelectedToken(token.id as keyof typeof TOKEN_CONFIGS)}
                     className={`flex items-center p-3 h-auto transition-colors ${
                       selectedToken === token.id 
                         ? "bg-blue-500 text-white border-blue-500" 
@@ -207,7 +291,7 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
                   step="0.0001"
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
-                  {TOKEN_CONFIGS[selectedToken]?.symbol}
+                  {getTokenConfig(selectedToken).symbol}
                 </div>
               </div>
             </div>
@@ -222,7 +306,7 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
               </div>
               <div className="flex justify-between items-center mt-1">
                 <span className="text-xs text-slate-500">
-                  Rate: 1 {TOKEN_CONFIGS[selectedToken]?.symbol} = ₹{currentPrice.toLocaleString('en-IN')}
+                  Rate: 1 {getTokenConfig(selectedToken).symbol} = ₹{currentPrice.toLocaleString('en-IN')}
                 </span>
                 <span className="text-xs text-emerald-600">
                   <RefreshCw className="w-3 h-3 mr-1 inline" />
@@ -240,7 +324,14 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
                 id="recipient"
                 placeholder="0x742d35Cc6648..."
                 value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (typeof val === 'string' && val.includes('@')) {
+                    val = val.slice(0, val.indexOf('@'));
+                  }
+                  setRecipient(val);
+                  setError(""); // Optionally clear error on change
+                }}
                 className={`font-mono text-sm ${
                   recipient && !isValidRecipient ? "border-red-300" : 
                   recipient && isValidRecipient ? "border-emerald-300" : ""
@@ -302,7 +393,17 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
                       network: walletState.network || "ethereum",
                       inrValue: inrValue.toString(),
                     });
-                    onSectionChange("transaction-status");
+                    onSectionChange("transaction-status", { transactionData: {
+                      hash,
+                      amount,
+                      token: selectedToken,
+                      inrValue: inrValue.toString(),
+                      network: walletState.network || "ethereum",
+                      status: "pending",
+                      from: walletState.address,
+                      to: recipient,
+                      timestamp: new Date().toISOString(),
+                    }});
                   }}
                   onError={(error) => setError(error)}
                   className="gradient-primary"
@@ -329,6 +430,23 @@ export function PaymentForm({ onSectionChange, recipientData }: PaymentFormProps
                 Back
               </Button>
             </div>
+            <Button
+              type="button"
+              className="w-full gradient-emerald text-white"
+              onClick={() => setShowQR(true)}
+              disabled={!recipient || !amount}
+            >
+              Generate MetaMask QR
+            </Button>
+            {showQR && qrString && (
+              <div className="flex flex-col items-center mt-4">
+                <QRCode value={qrString} size={180} />
+                <div className="text-xs mt-2 break-all text-center">{qrString}</div>
+                <Button variant="ghost" className="mt-2" onClick={() => setShowQR(false)}>
+                  Close
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

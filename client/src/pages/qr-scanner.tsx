@@ -31,10 +31,13 @@ export function QRScanner({ onSectionChange, onQRProcessed }: QRScannerProps) {
         videoRef.current,
         (result, err) => {
           if (result) {
-            setManualInput(result.getText());
+            const scannedValue = result.getText();
+            setManualInput(scannedValue);
             setScanning(false);
             codeReader?.stopContinuousDecode(); // stop scanning after a result
-            // Optionally auto-process the code here
+            // Always parse and pass the parsed result
+            const parsed = parseQRCode(scannedValue);
+            onQRProcessed(parsed);
           }
           if (err && !(err.name === 'NotFoundException')) {
             setCameraError(err.message || 'Camera error');

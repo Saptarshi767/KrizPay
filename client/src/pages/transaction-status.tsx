@@ -14,18 +14,28 @@ export function TransactionStatus({ onSectionChange, transactionData }: Transact
   const [currentStep, setCurrentStep] = useState(1);
   const [confirmations, setConfirmations] = useState(3);
 
-  // Mock transaction data for demonstration
-  const mockTransaction = {
-    hash: "0x742d35Cc6648Bb5a3c8B9c2c4C7d1A8b59C8B9c2",
-    amount: "0.5",
-    token: "ETH",
-    inrValue: "92620",
-    network: "ethereum",
-    status: "pending",
-    timestamp: new Date().toISOString(),
-  };
+  // Remove mockTransaction, only use real transactionData
+  if (!transactionData) {
+    return (
+      <section className="py-8">
+        <div className="max-w-md mx-auto px-4">
+          <Card className="shadow-xl border-slate-200">
+            <div className="gradient-primary p-6 text-white text-center">
+              <h2 className="text-xl font-semibold">Transaction Status</h2>
+              <p className="text-blue-100 text-sm">No transaction data available.</p>
+            </div>
+            <CardContent className="p-6">
+              <Button onClick={() => onSectionChange("home")} className="w-full gradient-primary text-white mt-4">
+                Return Home
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    );
+  }
 
-  const transaction = transactionData || mockTransaction;
+  const transaction = transactionData;
 
   useEffect(() => {
     // Simulate transaction progress
@@ -69,10 +79,18 @@ export function TransactionStatus({ onSectionChange, transactionData }: Transact
   ];
 
   const handleViewOnExplorer = () => {
-    const explorerUrl = getExplorerUrl(transaction.hash, transaction.network);
-    if (explorerUrl) {
-      window.open(explorerUrl, "_blank");
+    if (!transaction.hash) return;
+    let explorerUrl = `https://etherscan.io/tx/${transaction.hash}`;
+    if (transaction.network && typeof transaction.network === 'string') {
+      const net = transaction.network.toLowerCase();
+      if (net === 'sepolia') {
+        explorerUrl = `https://sepolia.etherscan.io/tx/${transaction.hash}`;
+      } else if (net === 'ethereum' || net === 'mainnet') {
+        explorerUrl = `https://etherscan.io/tx/${transaction.hash}`;
+      }
+      // Add more networks here if needed
     }
+    window.open(explorerUrl, "_blank");
   };
 
   return (

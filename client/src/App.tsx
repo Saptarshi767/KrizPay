@@ -20,8 +20,11 @@ function App() {
   const [qrData, setQrData] = useState(null);
   const [transactionData, setTransactionData] = useState(null);
 
-  const handleSectionChange = (section: string) => {
+  const handleSectionChange = (section: string, data?: any) => {
     setCurrentSection(section);
+    if (section === "transaction-status" && data && data.transactionData) {
+      setTransactionData(data.transactionData);
+    }
   };
 
   const handleQRProcessed = (data: any) => {

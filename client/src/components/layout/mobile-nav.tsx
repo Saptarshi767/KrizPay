@@ -15,7 +15,7 @@ export function MobileNav({ currentSection, onSectionChange }: MobileNavProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 lg:hidden z-50">
+    <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-50 flex justify-around py-2" role="navigation" aria-label="Mobile navigation">
       <div className="grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -36,6 +36,6 @@ export function MobileNav({ currentSection, onSectionChange }: MobileNavProps) {
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
