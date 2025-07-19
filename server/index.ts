@@ -54,7 +54,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Initialize routes with error handling
+// Main async setup
 (async () => {
   try {
     await registerRoutes(app);
@@ -74,9 +74,15 @@ app.get('/api/health', (req, res) => {
     if (app.get("env") === "production") {
       serveStatic(app);
     } else {
-      // Setup Vite in development
-      const server = await registerRoutes(app);
-      await setupVite(app, server);
+      await setupVite(app);
+    }
+
+    // Only start the server if not running in a serverless environment
+    if (import.meta.url === `file://${process.argv[1]}`) {
+      const port = process.env.PORT || 5000;
+      app.listen(port, () => {
+        console.log(`Server running on http://localhost:${port}`);
+      });
     }
   } catch (error) {
     console.error("Failed to initialize server:", error);
