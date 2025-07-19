@@ -1,10 +1,9 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertTransactionSchema, insertPaymentIntentSchema, insertCryptoPriceSchema } from "@shared/schema";
 import { nanoid } from "nanoid";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<void> {
   // User routes
   app.post("/api/users", async (req, res) => {
     try {
@@ -241,7 +240,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch prices", error: error.message });
     }
   });
-
-  const httpServer = createServer(app);
-  return httpServer;
 }
