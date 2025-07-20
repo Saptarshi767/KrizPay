@@ -2,13 +2,11 @@ import { useWallet } from "@/contexts/wallet-context";
 import { Button } from "@/components/ui/button";
 import { formatAddress } from "@/lib/wallet-utils";
 import { Wallet, Shield, Coins } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-interface NavigationProps {
-  onAdminClick: () => void;
-}
-
-export function Navigation({ onAdminClick }: NavigationProps) {
+export function Navigation() {
   const { state, connectMetaMask } = useWallet();
+  const navigate = useNavigate();
 
   return (
     <nav className="bg-white shadow-sm border-b border-slate-200 fixed top-0 w-full z-50">
@@ -45,7 +43,7 @@ export function Navigation({ onAdminClick }: NavigationProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={onAdminClick}
+              onClick={() => navigate("/admin-dashboard")}
             >
               <Shield className="w-4 h-4" />
             </Button>

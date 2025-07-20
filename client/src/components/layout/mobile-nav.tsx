@@ -1,17 +1,16 @@
 import { Home, QrCode, Wallet, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocation, useNavigate } from "react-router-dom";
 
-interface MobileNavProps {
-  currentSection: string;
-  onSectionChange: (section: string) => void;
-}
+export function MobileNav() {
+  const location = useLocation();
+  const navigate = useNavigate();
 
-export function MobileNav({ currentSection, onSectionChange }: MobileNavProps) {
   const navItems = [
-    { id: "home", label: "Home", icon: Home },
-    { id: "qr-scanner", label: "Scan", icon: QrCode },
-    { id: "wallet-connect", label: "Wallet", icon: Wallet },
-    { id: "admin-dashboard", label: "Admin", icon: BarChart3 },
+    { path: "/", label: "Home", icon: Home },
+    { path: "/qr-scanner", label: "Scan", icon: QrCode },
+    { path: "/wallet-connect", label: "Wallet", icon: Wallet },
+    { path: "/admin-dashboard", label: "Admin", icon: BarChart3 },
   ];
 
   return (
@@ -19,12 +18,12 @@ export function MobileNav({ currentSection, onSectionChange }: MobileNavProps) {
       <div className="grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentSection === item.id;
+          const isActive = location.pathname === item.path;
           
           return (
             <button
-              key={item.id}
-              onClick={() => onSectionChange(item.id)}
+              key={item.path}
+              onClick={() => navigate(item.path)}
               className={cn(
                 "flex flex-col items-center py-3 transition-colors",
                 isActive ? "text-blue-500" : "text-slate-500"
