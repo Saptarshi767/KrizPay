@@ -2,6 +2,7 @@
   "name": "passportpal-client",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "PassportPal Frontend - Vite + React",
   "scripts": {
     "dev": "vite",
@@ -15,6 +16,11 @@
   },
   "devDependencies": {
     "vite": "^4.0.0",
+    "tailwindcss": "^3.4.17",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss-animate": "^1.0.7",
+    "@tailwindcss/typography": "^0.5.15",
     "gh-pages": "^6.0.0"
   },
   "homepage": "./"
